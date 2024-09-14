@@ -124,7 +124,7 @@ class StreamsCog(commands.Cog):
             await interaction.response.send_message("No stream setups found.")
             return
 
-        message = "Current Stream Setups:\n"
+        embed = discord.Embed(title="Current Stream Setups", color=discord.Color.blue())
         for game_id, settings in config.items():
             role_id = settings.get('role_id')
             channel_id = settings['stream_channel_id']
@@ -132,12 +132,12 @@ class StreamsCog(commands.Cog):
             channel = interaction.guild.get_channel(channel_id)
             game_name = await self.get_game_name_from_id(game_id)
 
-            message += f"Game: {game_name} (ID: {game_id})\n"
-            message += f"Role: {role.name if role else 'None'}\n"
-            message += f"Channel: {channel.name if channel else 'Unknown'}\n"
-            message += "-------------\n"
+            embed.add_field(name=f"Game: {game_name} (ID: {game_id})", 
+                            value=f"Role: {role.name if role else 'None'}\nChannel: {channel.name if channel else 'Unknown'}", 
+                            inline=False)
+            embed.add_field(name="---", value="", inline=False)
 
-        await interaction.response.send_message(message)
+        await interaction.response.send_message(embed=embed) 
 
     @app_commands.command(name="removestreams", description="Remove a stream setup.")
     @app_commands.describe(game="Enter the Twitch game name or ID to remove")
