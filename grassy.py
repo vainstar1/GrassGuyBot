@@ -15,7 +15,8 @@ class Client(commands.Bot):
 
         self.cogslist = [
             "cogs.addrole",
-            "cogs.streams"
+            "cogs.streams",
+            "cogs.createimage"
         ]
 
     async def setup_hook(self):
