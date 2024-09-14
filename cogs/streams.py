@@ -285,5 +285,34 @@ class StreamsCog(commands.Cog):
 
                 self.sent_streams[guild.id][game_id][stream_id] = True
 
+    @app_commands.command(name="streams", description="Fetch and display active streams from a specified Twitch game category.")
+    @app_commands.describe(game="Enter the Twitch game name or ID")
+    async def streams(self, interaction: discord.Interaction, game: str):
+        if game.isdigit():
+            game_id = game
+        else:
+            game_id = await self.get_game_id_from_name(game)
+            if not game_id:
+                await interaction.response.send_message("Could not find game ID for the specified name.")
+                return
+
+        active_streams = self.get_active_streams_in_category(game_id)
+        
+        if not active_streams:
+            await interaction.response.send_message("No active streams found for this game.")
+            return
+
+        embed = discord.Embed(
+            title=f"Active Streams for {await self.get_game_name_from_id(game_id)}",
+            color=discord.Color.purple() 
+        )
+
+        for stream in active_streams[:10]: 
+            stream_link = f"https://www.twitch.tv/{stream['user_login']}"
+            stream_info = f"[{stream['user_name']}](https://www.twitch.tv/{stream['user_login']}) with {stream['viewer_count']} viewers."
+            embed.add_field(name=stream['title'], value=stream_info, inline=False)
+
+        await interaction.response.send_message(embed=embed)
+
 async def setup(client):
     await client.add_cog(StreamsCog(client))
