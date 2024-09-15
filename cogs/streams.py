@@ -8,6 +8,9 @@ import json
 import os
 
 class StreamsCog(commands.Cog):
+    
+    twitch_group = app_commands.Group(name="twitch", description="Configure your Twitch settings.")
+
     def __init__(self, client: commands.Bot):
         self.client = client
         self.config_file = "stream_config.json"
@@ -103,22 +106,28 @@ class StreamsCog(commands.Cog):
             print(f"Error fetching game name: {response.status_code} - {response.text}")
         return None
 
-    @app_commands.command(name="setupstreams", description="Set up streams with role, channel, and game.")
+    @twitch_group.command(name="setup", description="Set up streams with role, channel, and game.")
     @app_commands.describe(role="Choose the role to be pinged (optional)", channel="Select the channel for streams", game="Enter the Twitch game name or ID")
     async def setupstreams(self, interaction: discord.Interaction, game: str, channel: discord.TextChannel, role: discord.Role = None):
+
+        await interaction.response.defer()
+
         if game.isdigit():
             game_id = game
         else:
             game_id = await self.get_game_id_from_name(game)
             if not game_id:
-                await interaction.response.send_message("Could not find game ID for the specified name.")
+                await interaction.followup.send("Could not find game ID for the specified name.")
                 return
 
         self.set_server_config(interaction.guild.id, role.id if role else None, channel.id, game_id)
-        await interaction.response.send_message(f"Stream setup complete. Role: {role.name if role else 'None'}, Channel: {channel.name}, Game ID: {game_id}")
+        await interaction.followup.send(f"Stream setup complete. Role: {role.name if role else 'None'}, Channel: {channel.name}, Game ID: {game_id}")
 
-    @app_commands.command(name="viewstreams", description="View the current stream setups.")
-    async def viewstreams(self, interaction: discord.Interaction):
+    @twitch_group.command(name="view-setups", description="View the current stream setups.")
+    async def viewsetups(self, interaction: discord.Interaction):
+        
+        await interaction.response.defer()
+
         config = self.get_server_config(interaction.guild.id)
         if not config:
             await interaction.response.send_message("No stream setups found.")
@@ -137,11 +146,14 @@ class StreamsCog(commands.Cog):
                             inline=False)
             embed.add_field(name="---", value="", inline=False)
 
-        await interaction.response.send_message(embed=embed) 
+        await interaction.followup.send(embed=embed) 
 
-    @app_commands.command(name="removestreams", description="Remove a stream setup.")
+    @twitch_group.command(name="remove-setup", description="Remove a stream setup.")
     @app_commands.describe(game="Enter the Twitch game name or ID to remove")
-    async def removestreams(self, interaction: discord.Interaction, game: str):
+    async def removesetup(self, interaction: discord.Interaction, game: str):
+
+        await interaction.response.defer()
+
         if game.isdigit():
             game_id = game
         else:
@@ -151,24 +163,27 @@ class StreamsCog(commands.Cog):
                 return
 
         if self.remove_server_config(interaction.guild.id, game_id):
-            await interaction.response.send_message(f"Removed stream setup for Game ID: {game_id}")
+            await interaction.followup.send(f"Removed stream setup for Game ID: {game_id}")
         else:
-            await interaction.response.send_message("Stream setup for the specified game not found.")
+            await interaction.followup.send("Stream setup for the specified game not found.")
 
-    @app_commands.command(name="updatestreams", description="Update the role or channel for a specific game.")
+    @twitch_group.command(name="update-setup", description="Update the role or channel for a specific game.")
     @app_commands.describe(game="Enter the Twitch game name or ID", role="New role to be pinged (optional)", channel="New channel for streams (optional)")
-    async def updatestreams(self, interaction: discord.Interaction, game: str, role: discord.Role = None, channel: discord.TextChannel = None):
+    async def updatesetup(self, interaction: discord.Interaction, game: str, role: discord.Role = None, channel: discord.TextChannel = None):
+
+        await interaction.response.defer()
+
         if game.isdigit():
             game_id = game
         else:
             game_id = await self.get_game_id_from_name(game)
             if not game_id:
-                await interaction.response.send_message("Could not find game ID for the specified name.")
+                await interaction.followup.send("Could not find game ID for the specified name.")
                 return
 
         config = self.get_server_config(interaction.guild.id)
         if not config or game_id not in config:
-            await interaction.response.send_message("Stream setup for the specified game not found.")
+            await interaction.followup.send("Stream setup for the specified game not found.")
             return
 
         updated = False
@@ -181,9 +196,9 @@ class StreamsCog(commands.Cog):
 
         if updated:
             self.set_server_config(interaction.guild.id, config[game_id]['role_id'], config[game_id]['stream_channel_id'], game_id)
-            await interaction.response.send_message(f"Stream setup updated for Game ID: {game_id}. Role and/or channel has been changed.")
+            await interaction.followup.send(f"Stream setup updated for Game ID: {game_id}. Role and/or channel has been changed.")
         else:
-            await interaction.response.send_message("No changes were made.")
+            await interaction.followup.send("No changes were made.")
 
     @tasks.loop(minutes=30)
     async def refresh_token_task(self):
@@ -201,7 +216,7 @@ class StreamsCog(commands.Cog):
 
             for game_id, settings in config.items():
                 stream_channel_id = settings['stream_channel_id']
-                role_id = settings.get('role_id')  # Handle optional role_id
+                role_id = settings.get('role_id')
                 await self.send_streams_to_channels(guild, stream_channel_id, role_id, game_id)
 
     def refresh_twitch_token(self):
@@ -285,21 +300,23 @@ class StreamsCog(commands.Cog):
 
                 self.sent_streams[guild.id][game_id][stream_id] = True
 
-    @app_commands.command(name="streams", description="Fetch and display active streams from a specified Twitch game category.")
+    @twitch_group.command(name="streams", description="Fetch and display active streams from a specified Twitch game category.")
     @app_commands.describe(game="Enter the Twitch game name or ID")
     async def streams(self, interaction: discord.Interaction, game: str):
+        await interaction.response.defer()
+
         if game.isdigit():
             game_id = game
         else:
             game_id = await self.get_game_id_from_name(game)
             if not game_id:
-                await interaction.response.send_message("Could not find game ID for the specified name.")
+                await interaction.followup.send("Could not find game ID for the specified name.")
                 return
 
         active_streams = self.get_active_streams_in_category(game_id)
-        
+    
         if not active_streams:
-            await interaction.response.send_message("No active streams found for this game.")
+            await interaction.followup.send("No active streams found for this game.")
             return
 
         embed = discord.Embed(
@@ -309,10 +326,12 @@ class StreamsCog(commands.Cog):
 
         for stream in active_streams[:10]: 
             stream_link = f"https://www.twitch.tv/{stream['user_login']}"
-            stream_info = f"[{stream['user_name']}](https://www.twitch.tv/{stream['user_login']}) with {stream['viewer_count']} viewers."
+            stream_info = f"[{stream['user_name']}]({stream_link}) with {stream['viewer_count']} viewers."
             embed.add_field(name=stream['title'], value=stream_info, inline=False)
 
-        await interaction.response.send_message(embed=embed)
+        # Send the final response
+        await interaction.followup.send(embed=embed)
+
 
 async def setup(client):
     await client.add_cog(StreamsCog(client))
