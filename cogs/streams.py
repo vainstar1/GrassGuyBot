@@ -255,6 +255,25 @@ class StreamsCog(commands.Cog):
             print(f"Error fetching streams: {response.status_code} - {response.text}")
         return []
 
+    async def get_user_profile_image(self, user_id):
+        url = f"https://api.twitch.tv/helix/users"
+        headers = {
+            "Client-ID": self.TWITCH_CLIENT_ID,
+            "Authorization": "Bearer " + self.TWITCH_OAUTH_TOKEN
+        }
+        params = {
+            "id": user_id
+        }
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            users = data.get('data', [])
+            if users:
+                return users[0].get('profile_image_url')
+        else:
+            print(f"Error fetching user profile image: {response.status_code} - {response.text}")
+        return None
+
     async def send_streams_to_channels(self, guild, stream_channel_id, role_id, game_id):
         if guild.id not in self.sent_streams:
             self.sent_streams[guild.id] = {}
@@ -275,24 +294,30 @@ class StreamsCog(commands.Cog):
             if stream_id not in self.sent_streams[guild.id][game_id] or not self.sent_streams[guild.id][game_id][stream_id]:
                 stream_link = f"https://www.twitch.tv/{stream['user_login']}"
                 thumbnail_url = stream.get('thumbnail_url', '').replace('{width}', '1920').replace('{height}', '1080')
+                user_name = stream['user_name'].replace('_', '\\_')
+                profile_image_url = await self.get_user_profile_image(stream['user_id'])
+            
+                game_box_art_url = f"https://static-cdn.jtvnw.net/ttv-boxart/{game_id}_IGDB-90x120.jpg"
 
                 start_time = datetime.datetime.strptime(stream['started_at'], "%Y-%m-%dT%H:%M:%SZ")
-                utc = pytz.utc
-                est = pytz.timezone('America/New_York')
-                start_time = utc.localize(start_time).astimezone(est)
-
-                formatted_start_time = start_time.strftime("%m/%d/%Y, %I:%M %p")
+                current_time = datetime.datetime.utcnow()
+                uptime_duration = current_time - start_time
+                hours, remainder = divmod(int(uptime_duration.total_seconds()), 3600)
+                minutes, _ = divmod(remainder, 60)
+                uptime = f"{hours}h {minutes}m"
 
                 embed = discord.Embed(
                     title=stream['title'],
                     url=stream_link,
-                    description=f"{stream['user_name'] if stream['user_name'] else stream['user_login']} is streaming {await self.get_game_name_from_id(game_id)} with {stream['viewer_count']} viewers.\n[Watch](https://www.twitch.tv/{stream['user_login']})",
-                    color=discord.Color.purple()  # You can choose a different color
+                    description=f"{user_name} is streaming {await self.get_game_name_from_id(game_id)} with {stream['viewer_count']} viewers.\n[Watch]({stream_link})",
+                    color=discord.Color.purple()
                 )
-                embed.add_field(name="isMature", value=str(stream.get('is_mature', 'Unknown')), inline=True)
+                embed.add_field(name="Uptime", value=uptime, inline=True)
                 embed.add_field(name="Language", value=stream.get('language', 'Unknown'), inline=True)
                 embed.add_field(name="Started at", value=f"<t:{int(start_time.timestamp())}>", inline=True)
-                embed.set_image(url=thumbnail_url)
+                embed.set_thumbnail(url=game_box_art_url)  # Profile picture in the top left
+                embed.set_image(url=thumbnail_url)  # Game box art in the main image
+                embed.set_author(name=user_name, icon_url=profile_image_url)
                 embed.set_footer(text="Powered by Twitch API")
 
                 if channel:
