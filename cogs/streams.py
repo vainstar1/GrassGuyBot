@@ -33,7 +33,7 @@ class StreamsCog(commands.Cog):
             return config.get(str(guild_id), {})
         return {}
 
-    def set_server_config(self, guild_id, role_id, stream_channel_id, game_id, notifications_active=True):
+    def set_server_config(self, guild_id, role_id, stream_channel_id, game_id, notifications_active=None):
         if os.path.exists(self.config_file):
             with open(self.config_file, 'r') as file:
                 config = json.load(file)
@@ -41,15 +41,17 @@ class StreamsCog(commands.Cog):
             config = {}
 
         if str(guild_id) not in config:
-            config[str(guild_id)] = {}
+            config[str(guild_id)] = {'notifications_active': True} 
 
-        config[str(guild_id)]['notifications_active'] = notifications_active
+        if notifications_active is not None:
+            config[str(guild_id)]['notifications_active'] = notifications_active
 
         if game_id:
-            config[str(guild_id)][game_id] = {
-                'role_id': role_id,
-                'stream_channel_id': stream_channel_id
-            }
+            if game_id not in config[str(guild_id)]:
+                config[str(guild_id)][game_id] = {}
+
+            config[str(guild_id)][game_id]['role_id'] = role_id
+            config[str(guild_id)][game_id]['stream_channel_id'] = stream_channel_id
 
         with open(self.config_file, 'w') as file:
             json.dump(config, file, indent=4)
@@ -148,16 +150,20 @@ class StreamsCog(commands.Cog):
 
     @twitch_group.command(name="view-settings", description="View the current stream settings.")
     async def viewsetups(self, interaction: discord.Interaction):
-        
         await interaction.response.defer()
 
         config = self.get_server_config(interaction.guild.id)
-        if not config:
+        if not config or 'notifications_active' not in config:
             await interaction.followup.send("No stream settings found.")
             return
 
         embed = discord.Embed(title="Current Stream Settings", color=discord.Color.blue())
+        embed.add_field(name="Notifications Active", value="Yes" if config['notifications_active'] else "No")
+
         for game_id, settings in config.items():
+            if game_id == 'notifications_active':
+                continue  # Skip the notifications_active field
+
             role_id = settings.get('role_id')
             channel_id = settings['stream_channel_id']
             role = interaction.guild.get_role(role_id) if role_id else None
@@ -169,7 +175,7 @@ class StreamsCog(commands.Cog):
                             inline=False)
             embed.add_field(name="---", value="", inline=False)
 
-        await interaction.followup.send(embed=embed) 
+        await interaction.followup.send(embed=embed)
 
     @twitch_group.command(name="remove-setting", description="Remove a stream setting.")
     @app_commands.describe(game="Enter the Twitch game name or ID to remove")
