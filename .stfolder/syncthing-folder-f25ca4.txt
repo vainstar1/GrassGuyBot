@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: grassy-bot
+created: 2024-10-14T02:02:01-04:00

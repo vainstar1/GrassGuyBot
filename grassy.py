@@ -17,7 +17,8 @@ class Client(commands.Bot):
             "cogs.addrole",
             "cogs.streams",
             "cogs.createimage",
-            "cogs.translate"
+            "cogs.translate",
+            "cogs.fxtwitter"
         ]
 
     async def setup_hook(self):
